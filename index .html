@@ -1,0 +1,201 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Memory Unit Converter</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#9aa4b2;--accent:#38bdf8;--glass:rgba(255,255,255,0.03)}
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial}
+    body{background:linear-gradient(180deg,#071025 0%, #071026 60%);color:#e6eef6;display:flex;align-items:center;justify-content:center;padding:20px}
+    .wrap{width:100%;max-width:720px}
+    .card{background:var(--card);border-radius:14px;padding:18px;box-shadow:0 6px 20px rgba(2,6,23,0.6);backdrop-filter:blur(6px)}
+    header{display:flex;align-items:center;gap:12px}
+    header h1{font-size:1.15rem;margin:0}
+    p.lead{margin:6px 0 12px;color:var(--muted);font-size:0.95rem}
+    .form-row{display:flex;gap:10px;flex-wrap:wrap}
+    .field{flex:1;min-width:140px}
+    input[type=number],select{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:var(--glass);color:inherit;font-size:1rem}
+    .controls{display:flex;gap:10px;align-items:center;margin-top:10px}
+    .toggle{display:flex;gap:8px;align-items:center}
+    .results{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:14px}
+    .result{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03)}
+    .result .label{font-size:0.78rem;color:var(--muted)}
+    .result .value{font-weight:600;margin-top:6px;font-size:1.02rem}
+    button{padding:8px 10px;border-radius:10px;border:none;background:var(--accent);color:#042433;font-weight:700;cursor:pointer}
+    .small{font-size:0.85rem;padding:8px 10px}
+    footer{margin-top:12px;text-align:center;color:var(--muted);font-size:0.82rem}
+    .muted-line{height:1px;background:rgba(255,255,255,0.03);margin:12px 0;border-radius:2px}
+    @media (max-width:420px){.card{padding:14px}header h1{font-size:1rem}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" role="application" aria-label="Memory unit converter">
+      <header>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-opacity="0.12" stroke-width="1.5"/><path d="M7 3v2M17 3v2M7 19v2M17 19v2" stroke="currentColor" stroke-opacity="0.08" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <div>
+          <h1>Memory Unit Converter</h1>
+          <p class="lead">Enter a number and choose the unit — converts to common memory units (binary &amp; decimal).</p>
+        </div>
+      </header><div class="muted-line" aria-hidden="true"></div>
+
+  <div class="form">
+    <div class="form-row">
+      <div class="field">
+        <label for="amount" class="sr-only">Amount</label>
+        <input id="amount" type="number" inputmode="decimal" step="any" placeholder="Enter number (eg. 1.5)" aria-label="Amount" value="1">
+      </div>
+
+      <div class="field">
+        <label for="unit" class="sr-only">Unit</label>
+        <select id="unit" aria-label="Unit">
+          <option value="B">Bytes (B)</option>
+          <option value="KB">Kilobytes</option>
+          <option value="MB" selected>Megabytes</option>
+          <option value="GB">Gigabytes</option>
+          <option value="TB">Terabytes</option>
+          <option value="PB">Petabytes</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="toggle" role="group" aria-label="Unit standard">
+        <label for="standard">Standard:</label>
+        <select id="standard" aria-label="Conversion standard">
+          <option value="binary">Binary (1 KB = 1024 B)</option>
+          <option value="decimal">Decimal (1 KB = 1000 B)</option>
+        </select>
+      </div>
+
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button id="convert" class="small">Convert</button>
+        <button id="clear" class="small" type="button">Clear</button>
+      </div>
+    </div>
+
+    <div class="results" id="results" aria-live="polite"></div>
+  </div>
+
+  <div class="muted-line" aria-hidden="true"></div>
+
+  
+</div>
+
+  </div>  <script>
+    // Unit factors relative to Byte for both standards
+    const factors = {
+      binary: { B:1, KB:1024, MB:1024**2, GB:1024**3, TB:1024**4, PB:1024**5 },
+      decimal: { B:1, KB:1000, MB:1000**2, GB:1000**3, TB:1000**4, PB:1000**5 }
+    };
+
+    const amountEl = document.getElementById('amount');
+    const unitEl = document.getElementById('unit');
+    const standardEl = document.getElementById('standard');
+    const resultsEl = document.getElementById('results');
+    const convertBtn = document.getElementById('convert');
+    const clearBtn = document.getElementById('clear');
+
+    function formatNumber(n){
+      // show as integer when possible, else up to 6 decimal places trimmed
+      if (!isFinite(n)) return '—';
+      if (Math.abs(n) >= 1e9) return n.toExponential(6);
+      if (Math.abs(n - Math.round(n)) < 1e-12) return String(Math.round(n));
+      return Number(n).toFixed(6).replace(/(?:\.\d*?)0+$/,'').replace(/\.$/,'');
+    }
+
+    function convert(){
+      const raw = parseFloat(amountEl.value);
+      if (isNaN(raw)) { resultsEl.innerHTML = '<div class="result">Please enter a valid number.</div>'; return; }
+      const unit = unitEl.value;
+      const standard = standardEl.value;
+      const factor = factors[standard][unit];
+      // convert input to bytes first
+      const bytes = raw * factor;
+
+      const order = ['B','KB','MB','GB','TB','PB'];
+      resultsEl.innerHTML = '';
+      order.forEach(u => {
+        const val = bytes / factors[standard][u];
+        const node = document.createElement('div');
+        node.className = 'result';
+        node.innerHTML = `<div class="label">${u}</div><div class="value" data-unit="${u}">${formatNumber(val)} ${u}</div>`;
+
+        
+        resultsEl.appendChild(node);
+      });
+    }
+
+    convertBtn.addEventListener('click', (e)=>{ e.preventDefault(); convert(); });
+    clearBtn.addEventListener('click', ()=>{ amountEl.value=''; resultsEl.innerHTML=''; amountEl.focus(); });
+
+    // allow live convert on enter
+    amountEl.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') convert(); });
+
+    // initial convert
+    convert();
+  </script>  <script>
+    // --- Simple Memory Unit Quiz Game ---
+    const gameBox = document.createElement('div');
+    gameBox.className = 'card';
+    gameBox.style.marginTop = '20px';
+    gameBox.innerHTML = `
+      <h2 style="margin-top:0;font-size:1.1rem">Memory Unit Quiz Game</h2>
+      <p class="lead">Convert the value shown into the asked unit.</p>
+      <div id="quiz-question" style="margin:10px 0;font-size:1rem;font-weight:600"></div>
+      <input id="quiz-answer" type="number" step="any" placeholder="Enter your answer" style="width:100%;padding:10px;border-radius:8px;margin-bottom:10px" />
+      <button id="quiz-submit" class="small">Submit</button>
+      <div id="quiz-result" style="margin-top:10px;font-size:0.95rem"></div>
+    `;
+
+    document.querySelector('.wrap').appendChild(gameBox);
+
+    const qBox = document.getElementById('quiz-question');
+    const aBox = document.getElementById('quiz-answer');
+    const rBox = document.getElementById('quiz-result');
+    const submitBtn = document.getElementById('quiz-submit');
+
+    const quizUnits = ['B','KB','MB','GB'];
+
+    let correctAnswer = 0;
+
+    function generateQuestion(){
+      const baseUnit = quizUnits[Math.floor(Math.random()*quizUnits.length)];
+      const targetUnit = quizUnits[Math.floor(Math.random()*quizUnits.length)];
+      const number = Math.floor(Math.random()*900)+100;
+      const std = 'binary';
+
+      const baseBytes = number * factors[std][baseUnit];
+      correctAnswer = baseBytes / factors[std][targetUnit];
+
+      qBox.textContent = `Convert ${number} ${baseUnit} to ${targetUnit}`;
+      aBox.value = '';
+      rBox.textContent = '';
+    }
+
+    submitBtn.addEventListener('click', ()=>{
+      const user = parseFloat(aBox.value);
+      if (isNaN(user)){
+        rBox.textContent = 'Please enter a valid number.';
+        rBox.style.color = '#f87171';
+        return;
+      }
+
+      const diff = Math.abs(user - correctAnswer);
+      if (diff < 0.001){
+        rBox.textContent = 'Correct! 🎉';
+        rBox.style.color = '#4ade80';
+      } else {
+        rBox.textContent = `Incorrect! Correct answer is ${correctAnswer.toFixed(4)}`;
+        rBox.style.color = '#f87171';
+      }
+
+      setTimeout(generateQuestion, 2000);
+    });
+
+    generateQuestion();
+  </script>  <footer style="text-align:center;color:green;font-weight:bold;font-size:0.85rem;margin-top:20px;">Created by Rajwinder Kaur Computer Faculty GSSS Harike</footer>
+</body>
+</html>
